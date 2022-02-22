@@ -2,12 +2,18 @@
 <html>
 <!-- Head -->
 <head>
-<script src='https://abubujs.org/libs/Abubu.latest.js'
+<script src='./abubu.js'
 	type='text/javascript'></script>
 </head>
 <!-- body of the html page -->
 <body>
        <canvas id="canvas_0" 
+            width=512 height=512
+            style="border:1px solid #000000;" >
+        <!-- This message is displayed if canvas is not available -->
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+    <canvas id="canvas_0_1" 
             width=512 height=512
             style="border:1px solid #000000;" >
         <!-- This message is displayed if canvas is not available -->
@@ -420,28 +426,12 @@ var env = {
         my : 8 ,    // the number of z-slices in the vertical direction
 } ;
 
-// var env = {
-//         running : false ,
-//         a : -0.1 ,
-//         beta : 0.3,
-//         epsilon : 0.01,
-//         gamma : 1.,
-//         delta : 0.,
-//         dt : 0.01 ,
-//         diffCoef : 0.001 ,
-//         nx_ny : 10.,
-//         time : 0,
-//         nx : 64 ,   // resolution in x-direction
-//         ny : 64 ,   // resolution in y-direction
-//         mx : 8 ,    // the number of z-slices in horizontal direction
-//         my : 8 ,    // the number of z-slices in the vertical direction
-// } ;
-
 //#region ************************************************************************************************ 1D *************************************
 var canvas_0 = document.getElementById('canvas_0') ;
+var canvas_0_1 = document.getElementById('canvas_0_1') ;
 
-var fcolor_1D = new Abubu.Float32Texture(512,512) ;
-var scolor_1D = new Abubu.Float32Texture(512,512) ;
+var fcolor_1D = new Abubu.Float32Texture(512,512, { pairable : true }) ;
+var scolor_1D = new Abubu.Float32Texture(512,512, { pairable : true }) ;
 
 var init_1D = new Abubu.Solver({
         fragmentShader : source( 'init-1D') ,
@@ -501,14 +491,78 @@ var plot_1D = new Abubu.Plot2D({
     minValue : 0 ,              /* minimum value on the colormap        */
     maxValue : 1 ,             /* maximum value on the colormap        */
     colorbar : true ,           /* if you need to show the colorbar     */
+    probeVisible : true ,
     canvas : canvas_0 ,         /* the canvas to draw on                */
 }) ;
+
+plot_1D.addMessage('FitzHugh-Nagumo Model', 0.05,0.05,{
+    font : 'Bold 12pt Arial' ,
+    align : 'start',
+    style : '#ffffff', 
+    } ) ;
+
+plot_1D.time = plot_1D.addMessage('Time = 0.00 ms' , 0.05,0.13,{
+    font : '11pt Arial' ,
+    align : 'start',
+    style : '#ffffff', 
+} ) ;
 
 plot_1D.init() ;   /* initialize the plot */
 plot_1D.render() ;
 //#endregion
 
 
+
+var splot = new Abubu.SignalPlot({
+    noPltPoints : 1024, // number of sample points
+    grid : 'on', 
+    nx   : 10 , // number of division in x 
+    ny   : 15 , // ... in y 
+
+    xticks : { mode : 'auto', unit : 'ms', font : '11pt Times' } ,
+    yticks : { mode : 'auto', unit : '' , font : '12pt Times',precision : 1  } ,
+    
+    canvas : canvas_0_1 
+} ) ;
+splot.addMessage(
+    'Signal at the probe', 0.5,0.05,{
+        font : 'Bold 14pt Arial' ,
+        align: 'center',
+        style: "#ff0000" ,
+    } ) ;
+env.usgn = splot.addSignal( fcolor_1D, {
+    channel : 'r',
+    minValue : -.3,
+    maxValue : 1.2 ,
+    restValue : 1 ,
+    color : [ 1.,0.,0.0 ],
+    visible : true ,
+    timewindow : 1000 , 
+    probePosition : [0.5,0.5] 
+} ) ;
+
+env.vsgn = splot.addSignal( fcolor_1D, {
+    channel : 'g',
+    minValue : -.3,
+    maxValue : 1.2 ,
+    restValue : 0 ,
+    color : [ 0.,1.,0.0 ],
+    visible : true ,
+    timewindow : 1000 , 
+    probePosition : [0.5,0.5] 
+} ) ;
+// set probe position ....................................................
+var setProbe = new Abubu.MouseListener({
+    canvas : canvas_0_1 ,
+    event  : 'click' ,
+    shift  : true ,
+    callback : function(e){
+        plot_1D.setProbePosition(e.position) ;
+        splot.setProbePosition(e.position) ;
+        splot.init() ;
+        plot_1D.init() ;
+    }
+} ) ;
 //#region ************************************************************************************************ 2D *************************************
 
 // Get the canvas --------------------------------------------------------
@@ -787,9 +841,13 @@ function run(){
                 march_1D();
                 march() ;
                 march_3D();
+                env.usgn.update(env.time) ;
+                env.vsgn.update(env.time) ;
                 env.time += env.dt*2.;
             }
         }
+        splot.render() ;
+        plot_1D.time.text = "Time = " + env.time.toFixed(2) + " ms" ;
         plot_1D.render();
         plot.render() ;
         plot_3D.render();
